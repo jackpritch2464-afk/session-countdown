@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>London Session Countdown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100vh; background: #0e0e0e; color: #fff; font-family: 'DM Sans', sans-serif; display: flex; align-items: center; justify-content: center; padding: 24px; }
+
+.card { background: #181818; border: 0.5px solid #2a2a2a; border-radius: 16px; padding: 28px; width: 100%; max-width: 420px; }
+
+.top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+.session-label { font-size: 11px; color: #555; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+.session-name { font-size: 16px; font-weight: 500; color: #e5e5e5; }
+.status-pill { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; }
+.status-pill.waiting  { background: #1e1e1e; color: #555; border: 0.5px solid #2a2a2a; }
+.status-pill.open     { background: #0a2018; color: #4ade80; border: 0.5px solid #1a4030; }
+.status-pill.cutoff   { background: #200a0a; color: #f87171; border: 0.5px solid #3a1515; }
+.status-pill.closed   { background: #1e1e1e; color: #555; border: 0.5px solid #2a2a2a; }
+
+.countdown-wrap { text-align: center; margin: 8px 0 28px; }
+.countdown { font-family: 'DM Mono', monospace; font-size: 56px; font-weight: 500; letter-spacing: 0.04em; line-height: 1; transition: color 0.4s; }
+.countdown.waiting { color: #e5e5e5; }
+.countdown.open    { color: #4ade80; }
+.countdown.cutoff  { color: #f87171; }
+.countdown.closed  { color: #444; }
+.countdown-sub { font-size: 12px; color: #444; margin-top: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+
+.divider { border: none; border-top: 0.5px solid #1e1e1e; margin-bottom: 20px; }
+
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.info-card { background: #111; border: 0.5px solid #2a2a2a; border-radius: 10px; padding: 12px 14px; }
+.info-label { font-size: 11px; color: #555; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.info-value { font-family: 'DM Mono', monospace; font-size: 15px; color: #aaa; }
+.info-value.highlight { color: #4ade80; }
+.info-value.red { color: #f87171; }
+
+.progress-wrap { margin-top: 20px; }
+.progress-label { display: flex; justify-content: space-between; font-size: 11px; color: #444; margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
+.progress-bar { background: #111; border-radius: 99px; height: 4px; overflow: hidden; border: 0.5px solid #222; }
+.progress-fill { height: 100%; border-radius: 99px; transition: width 1s linear, background 0.4s; }
+.progress-fill.waiting { background: #2a2a2a; }
+.progress-fill.open    { background: #4ade80; }
+.progress-fill.cutoff  { background: #f87171; }
+
+.footer { text-align: center; margin-top: 20px; font-size: 11px; color: #2a2a2a; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="top-row">
+    <div>
+      <div class="session-label">Next Session</div>
+      <div class="session-name" id="sessionName">London Open</div>
+    </div>
+    <div class="status-pill waiting" id="statusPill">WAITING</div>
+  </div>
+
+  <div class="countdown-wrap">
+    <div class="countdown waiting" id="countdown">--:--:--</div>
+    <div class="countdown-sub" id="countdownSub">until london open</div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="info-label">London Open</div>
+      <div class="info-value highlight" id="infoOpen">--:--</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Cut-off Time</div>
+      <div class="info-value red" id="infoCutoff">--:--</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Your Time</div>
+      <div class="info-value" id="infoLocal">--:--:--</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">GMT Time</div>
+      <div class="info-value" id="infoGMT">--:--:--</div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="progLeft">London Open</span>
+      <span id="progRight">Cut-off</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill waiting" id="progressFill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="footer">London open = 08:00 GMT &nbsp;·&nbsp; DST-aware &nbsp;·&nbsp; AEST</div>
+</div>
+
+<script>
+// London opens at 08:00 GMT always.
+// AEST = GMT+10, AEDT = GMT+11 (DST: first Sun Oct to first Sun Apr)
+// UK BST = GMT+1 (last Sun Mar to last Sun Oct)
+// We just use UTC offsets — no need to track UK DST since London open is always 08:00 GMT.
+
+function getAESTOffset() {
+  // Australia/Sydney: AEDT (UTC+11) from first Sun in Oct to first Sun in Apr
+  // AEST (UTC+10) otherwise
+  const now = new Date();
+  const year = now.getUTCFullYear();
+
+  function firstSunday(year, month) {
+    // month is 0-indexed
+    const d = new Date(Date.UTC(year, month, 1));
+    const dow = d.getUTCDay();
+    const diff = dow === 0 ? 0 : 7 - dow;
+    return new Date(Date.UTC(year, month, 1 + diff));
+  }
+
+  // AEDT starts first Sunday of October
+  const aedtStart = firstSunday(year, 9); // October
+  // AEDT ends first Sunday of April
+  const aedtEnd = firstSunday(year, 3);   // April
+
+  const nowMs = now.getTime();
+
+  // AEDT period: Oct first Sun → Dec 31, and Jan 1 → Apr first Sun
+  const inAEDT = nowMs >= aedtStart.getTime() || nowMs < aedtEnd.getTime();
+  return inAEDT ? 11 : 10;
+}
+
+function isUKonBST(date) {
+  // BST: last Sunday of March to last Sunday of October
+  const year = date.getUTCFullYear();
+  function lastSunday(yr, month) {
+    const lastDay = new Date(Date.UTC(yr, month + 1, 0));
+    const dow = lastDay.getUTCDay();
+    return new Date(Date.UTC(yr, month, lastDay.getUTCDate() - dow));
+  }
+  const bstStart = lastSunday(year, 2); // last Sun March
+  const bstEnd   = lastSunday(year, 9); // last Sun October
+  return date >= bstStart && date < bstEnd;
+}
+
+function isUKonBST(date) {
+  // BST: last Sunday of March to last Sunday of October
+  const year = date.getUTCFullYear();
+  function lastSunday(yr, month) {
+    const lastDay = new Date(Date.UTC(yr, month + 1, 0));
+    const dow = lastDay.getUTCDay();
+    return new Date(Date.UTC(yr, month, lastDay.getUTCDate() - dow));
+  }
+  const bstStart = lastSunday(year, 2); // last Sun March
+  const bstEnd   = lastSunday(year, 9); // last Sun October
+  return date >= bstStart && date < bstEnd;
+}
+
+function getLondonOpenUTC(date) {
+  // London opens at 08:00 local time: 07:00 UTC during BST, 08:00 UTC during GMT
+  const hour = isUKonBST(date) ? 7 : 8;
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hour, 0, 0);
+}
+
+function fmt2(n) { return String(Math.floor(n)).padStart(2, '0'); }
+
+function fmtCountdown(ms) {
+  if (ms <= 0) return '00:00:00';
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${fmt2(h)}:${fmt2(m)}:${fmt2(s)}`;
+}
+
+function fmtLocalTime(date, offsetHours) {
+  const localMs = date.getTime() + offsetHours * 3600000;
+  const d = new Date(localMs);
+  return `${fmt2(d.getUTCHours())}:${fmt2(d.getUTCMinutes())}:${fmt2(d.getUTCSeconds())}`;
+}
+
+function fmtLocalHHMM(utcMs, offsetHours) {
+  const d = new Date(utcMs + offsetHours * 3600000);
+  const h = d.getUTCHours();
+  const m = fmt2(d.getUTCMinutes());
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${m} ${ampm}`;
+}
+
+function tick() {
+  const now = new Date();
+  const aestOffset = getAESTOffset();
+  const nowMs = now.getTime();
+
+  // London open today in UTC ms
+  let londonOpenMs = getLondonOpenUTC(now);
+  // If already past today's london open, get tomorrow's
+  if (nowMs >= londonOpenMs + 3 * 3600000) {
+    // past cutoff — show tomorrow's open
+    const tomorrow = new Date(nowMs + 86400000);
+    londonOpenMs = getLondonOpenUTC(tomorrow);
+  }
+
+  const cutoffMs = londonOpenMs + 3 * 3600000; // +3 hours
+
+  // State
+  let state, countdownMs, sub;
+  if (nowMs < londonOpenMs) {
+    state = 'waiting';
+    countdownMs = londonOpenMs - nowMs;
+    sub = 'until london open';
+  } else if (nowMs < cutoffMs) {
+    state = 'open';
+    countdownMs = cutoffMs - nowMs;
+    sub = 'until trade cut-off';
+  } else {
+    state = 'closed';
+    countdownMs = londonOpenMs - nowMs; // time until tomorrow's open (already set above)
+    sub = 'until next london open';
+  }
+
+  // Countdown display
+  document.getElementById('countdown').textContent = fmtCountdown(countdownMs);
+  document.getElementById('countdown').className = 'countdown ' + state;
+  document.getElementById('countdownSub').textContent = sub;
+
+  // Session name
+  if (state === 'open') {
+    document.getElementById('sessionName').textContent = 'London Open ✦';
+  } else if (state === 'closed') {
+    document.getElementById('sessionName').textContent = 'Session Closed';
+  } else {
+    document.getElementById('sessionName').textContent = 'London Open';
+  }
+
+  // Pill
+  const pill = document.getElementById('statusPill');
+  if (state === 'waiting') { pill.className = 'status-pill waiting'; pill.textContent = 'WAITING'; }
+  else if (state === 'open') { pill.className = 'status-pill open'; pill.textContent = 'LIVE'; }
+  else { pill.className = 'status-pill closed'; pill.textContent = 'CLOSED'; }
+
+  // Info cards
+  document.getElementById('infoOpen').textContent = fmtLocalHHMM(londonOpenMs, aestOffset);
+  document.getElementById('infoCutoff').textContent = fmtLocalHHMM(cutoffMs, aestOffset);
+  document.getElementById('infoLocal').textContent = fmtLocalTime(now, aestOffset);
+  document.getElementById('infoGMT').textContent = `${fmt2(now.getUTCHours())}:${fmt2(now.getUTCMinutes())}:${fmt2(now.getUTCSeconds())}`;
+
+  // Progress bar (only meaningful when session is open)
+  const fill = document.getElementById('progressFill');
+  if (state === 'open') {
+    const elapsed = nowMs - londonOpenMs;
+    const total = 3 * 3600000;
+    const pct = Math.min(100, (elapsed / total) * 100);
+    fill.style.width = pct + '%';
+    fill.className = 'progress-fill open';
+    document.getElementById('progLeft').textContent = 'Open';
+    document.getElementById('progRight').textContent = 'Cut-off';
+  } else if (state === 'waiting') {
+    fill.style.width = '0%';
+    fill.className = 'progress-fill waiting';
+    document.getElementById('progLeft').textContent = 'London Open';
+    document.getElementById('progRight').textContent = 'Cut-off';
+  } else {
+    fill.style.width = '100%';
+    fill.className = 'progress-fill cutoff';
+    document.getElementById('progLeft').textContent = 'Session Closed';
+    document.getElementById('progRight').textContent = '';
+  }
+}
+
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
